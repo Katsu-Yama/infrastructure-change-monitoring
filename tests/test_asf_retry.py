@@ -1,10 +1,14 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from asf_search.exceptions import ASFSearch4xxError, ASFSearch5xxError
+try:
+    from asf_search.exceptions import ASFSearch4xxError, ASFSearch5xxError
+except ImportError:
+    ASFSearch4xxError = ASFSearch5xxError = None
 from scripts.asf_retry import catalog_request
 
 
+@unittest.skipIf(ASFSearch5xxError is None, 'requires optional Sentinel-1 dependencies')
 class CatalogRetryTests(unittest.TestCase):
     @patch('scripts.asf_retry.time.sleep')
     def test_temporary_failure_retries_same_read(self, sleep):

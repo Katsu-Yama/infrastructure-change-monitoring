@@ -11,7 +11,7 @@
 - [x] 収集・解析・公開コードをGitHubに保存し、CIを通す（下記検証記録）。
 - [ ] 月次Actionsを起動し、実データで保存・公開まで完走する。
 - [x] Supabaseで保存結果の読戻し、匿名SELECT、匿名書込み禁止を検証する（履歴レポートで全JSON一致）。
-- [ ] Cloudflareの公開URLをブラウザで検証する。
+- [x] Cloudflareの公開URLをブラウザで検証する（履歴画面）。
 - [ ] 課金するサービスを使わず、無料枠内の転送・保存・実行量を記録する。
 
 ## 現在の処理
@@ -28,7 +28,17 @@
 
 SQLのロール切替テストでは、service_roleの公開RPC、公開済み行だけの匿名SELECT、匿名INSERT/UPDATE/DELETE/RPC拒否、中間テーブル・カタログの匿名読取り拒否を確認した。テストデータは同一トランザクション内でロールバックした。実際のHTTPでも `scripts/verify_supabase.py` により公開レポートのSELECTと権限拒否を確認した。
 
-GitHub Actionsの `SUPABASE_URL` と `SUPABASE_PUBLISHABLE_KEY` は登録・読戻し済み。Secretsは未登録であり、`SUPABASE_SECRET_KEY`、CloudflareのアカウントID・APIトークン、Earthdataのユーザー名・パスワードが必要。現在はこの認証接続、Cloudflare公開、新規観測の実処理、施設台帳との照合が未完了である。
+GitHub Actionsの `SUPABASE_URL` と `SUPABASE_PUBLISHABLE_KEY` は登録・読戻し済み。ユーザーによるSecrets５項目の登録後、秘密値を取得・表示せず登録名を確認した。Cloudflare公開とSupabaseサーバーキーによる非公開テーブル・バケットの読取りは成功した。Earthdata認証は通信エラーで確認できておらず、新規観測の実処理と施設台帳との照合は未完了である。
+
+### Secrets登録後の実サービス検証
+
+- [Cloudflare公開実行39395641587](https://github.com/Katsu-Yama/infrastructure-change-monitoring/actions/runs/39395641587) は成功。初回の「Pages project does not exist」に対し、対象プロジェクトだけを初回作成する処理を追加した。[公開URL](https://mikawa-insar.pages.dev) のHTTP 200と、全1,350点を含むレポートJSONのSupabase最新公開内容との完全一致を確認した。
+- 公開URLを実ブラウザで開き、履歴警告・地図・時系列・CSV・メモ保持・390pxのモバイル表示を確認した。処理月2026-10と最終観測2025-11-08を区別している。
+- コード `fbdcdd3` の [CI実行39396169059](https://github.com/Katsu-Yama/infrastructure-change-monitoring/actions/runs/39396169059) は通常・科学計算・実DB権限の３ジョブすべて成功。科学計算環境では21件のPythonテスト（合成変位のMintPy復元を含む）、Web側は６件のテストを通過した。
+- [月次実行39396213026](https://github.com/Katsu-Yama/infrastructure-change-monitoring/actions/runs/39396213026) はSupabase非公開読取りに成功したが、Earthdata/HyP3接続で `ConnectionError`。認証拒否の証拠ではなく、資格情報の有効性はまだ確認できない。秘密値・応答本文はログへ出していない。接続確認ステップには５分上限を設けた。
+- [カタログ実行39396216139](https://github.com/Katsu-Yama/infrastructure-change-monitoring/actions/runs/39396216139) は20秒・40秒の上限付き再試行後もNASA CMRからHTTP 500。認証不要の同一検索とCMR healthのHTTP 500も手元で再現した。[NASA公式ステータス](https://status.earthdata.nasa.gov/) はSearch IntegrityのService Degradationを表示している。
+- これらの実行からHyP3ジョブは未送信。Supabaseの中間画像・カタログは０件、公開済み履歴は１件のまま。失敗を正常な空データとして保存せず、既存の公開画面を維持した。
+- 次の確認は外部通信復旧後の月次実行。初回の新規干渉処理、実測の精度・観測可能性、施設対応、実運用時の保存・転送量は引き続き未検証。
 
 保存後のDB全体は約11MB、レポートテーブル約408KiB。新規InSAR実運用の保存・転送・処理量はまだ未検証。Security Advisorは警告・エラーなし、非公開２テーブルの「RLS有効・ポリシーなし」がINFOとして出る。これは匿名利用を許可しない構成で、実際に拒否されることを確認した。[公式の説明](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)
 
@@ -68,7 +78,7 @@ GSI公開データは約90mで、更新は観測ごとのリアルタイム公�
 1. 専用Supabaseプロジェクトを無料組織で作成し、`docs/schema.sql` と `docs/interferogram-schema.sql` を適用する。
 2. GitHubのActions variablesに `SUPABASE_URL` と `SUPABASE_PUBLISHABLE_KEY` を登録する。
 3. Actions secretsに `SUPABASE_SECRET_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` を登録する。チャットやリポジトリに秘密値を貼らない。
-4. Cloudflare PagesのDirect Uploadプロジェクト `mikawa-insar` を作成する。APIトークンの権限は対象アカウントのPages Editに限定する。
+4. Cloudflare APIトークンの権限は対象アカウントのPages Editに限定する。`npm run deploy` がDirect Uploadプロジェクト `mikawa-insar` の不在時だけ作成する。認証失敗やサーバーエラーでは作成しない。
 5. Earthdataの認証情報をActions Secretsへ登録する。`Monthly InSAR monitoring` を手動実行し、新規InSAR・Supabase読戻し・Cloudflareデプロイを確認する。履歴だけの先行試運転には `INSAR_SOURCE=gsi` を使う。
 6. 公開画面の処理月・最終観測日・欠測・履歴表示を確認する。
 
@@ -78,7 +88,7 @@ Actionsのcronは毎月2日05:17 JST。処理に失敗した場合はエラー�
 
 40m解像度・20m画素間隔のSentinel-1 Burst InSARをASF HyP3 Basicで処理する経路を採用候補とする。Earthdata認証が必要。無料Basicは月8,000クレジット。`5x1` の単一バーストペアは1クレジットで、初期履歴を含めた処理を小分けにできる。追加クレジット購入・HyP3+には自動移行しない。
 
-`scripts/process_sentinel.py` に取得・AOI切出し・非公開保存・品質マスク・MintPy時系列化のコードを実装済み。2026年10月20日の実カタログ検索で、北行50観測93ペア（最終2026年10月11日）・南行41観測67ペア（最終2026年10月5日）を確認した。認証が未接続のため、この160ペアの干渉処理・時系列化はまだ実行していない。以下は実サービスでの検証が必要。
+`scripts/process_sentinel.py` に取得・AOI切出し・非公開保存・品質マスク・MintPy時系列化のコードを実装済み。2026年10月20日の先行した実カタログ検索で、北行50観測93ペア（最終2026年10月11日）・南行41観測67ペア（最終2026年10月5日）を確認した。Secrets登録後の実行は上記の外部通信エラーで停止し、この160ペアの干渉処理・時系列化はまだ実行していない。以下は実サービスでの検証が必要。
 
 - ASFでAOIを包含する同一burstのVV観測を検索する。
 - 観測間隔と軌道の整合する複数ペアをつなぎ、SBASネットワークを作る。

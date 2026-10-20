@@ -28,7 +28,11 @@ def main():
         print(f'PASS: Earthdata authentication and HyP3 Basic access; remaining free credits: {remaining}', flush=True)
     except Exception as error:
         failures.append('Earthdata/HyP3')
-        print(f'FAIL: Earthdata/HyP3 access ({type(error).__name__}); check username/password and ASF authorization', flush=True)
+        from requests.exceptions import ConnectionError, Timeout
+        if isinstance(error, (ConnectionError, Timeout)):
+            print(f'FAIL: Earthdata/HyP3 network unavailable ({type(error).__name__}); credential validity is not yet established', flush=True)
+        else:
+            print(f'FAIL: Earthdata/HyP3 access ({type(error).__name__}); check credentials, profile and ASF authorization', flush=True)
     if failures:
         raise SystemExit('Connection preflight failed: ' + ', '.join(failures))
 

@@ -4,6 +4,8 @@
 
 実データを使った収集・解析・Web画面を追加しました。従来のヒアリングモックは、このREADMEの後半と既存 `index.html` にあります。
 
+公開画面：[三河港 InSAR Monitor](https://mikawa-insar.pages.dev)。現在は最終観測2025年11月8日の履歴です。新規Sentinel-1の月次解析結果ではありません。
+
 | 機能 | 実装 | 検証状態 |
 |---|---|---|
 | 約9.62km²の国土地理院InSAR履歴取得 | `scripts/collect.py` | 実データで動作確認 |
@@ -13,7 +15,8 @@
 | 新規干渉処理・時系列化 | `scripts/process_sentinel.py` | HyP3 Basic＋MintPy。認証後の実データ検証が必要 |
 | AOI干渉画像の非公開保存 | `scripts/pair_store.py`, `scripts/clip_pair.py` | 切出し数値テスト済み。Supabase接続後の検証が必要 |
 | Supabase保存・匿名読取り | `docs/schema.sql`, `scripts/publish.py` | 専用無料プロジェクト作成・実履歴保存・全JSON一致・匿名権限検証済み |
-| 月次Actions・Cloudflare公開 | `.github/workflows/` | Secrets設定・初回完走の検証待ち |
+| Cloudflare公開 | `.github/workflows/deploy.yml` | 実公開・ブラウザ・全データのSupabase一致を検証済み |
+| 月次Actions | `.github/workflows/monthly.yml` | Secrets５項目登録済み。NASA検索HTTP 500とEarthdata/ASF通信エラーにより初回完走は未完了 |
 
 公開済みGSI成果の再集計と、新規Sentinel-1の月次処理は別の段階です。現在の履歴画面は個別施設の現況監視が完了したことを示しません。データ解像度90mで、橋梁等の安全判定はできません。
 
@@ -44,7 +47,7 @@ python -m scripts.sentinel plan
 
 Supabaseに `docs/schema.sql` と `docs/interferogram-schema.sql` を適用し、GitHub Actionsのvariables/secretsを登録します。
 
-専用プロジェクト [mikawa-insar](https://supabase.com/dashboard/project/sxbvyjgzrzynkvounfxy) は東京リージョンで作成済みです。テーブルと非公開バケットも設定済みで、`SUPABASE_URL` と `SUPABASE_PUBLISHABLE_KEY` はGitHub ActionsのVariablesへ登録・読戻し済みです。残るSecretsの値は、コードやチャットへ貼らずGitHubの設定画面へ登録してください。
+専用プロジェクト [mikawa-insar](https://supabase.com/dashboard/project/sxbvyjgzrzynkvounfxy) は東京リージョンで作成済みです。テーブルと非公開バケットも設定済みで、`SUPABASE_URL` と `SUPABASE_PUBLISHABLE_KEY` はGitHub ActionsのVariablesへ登録・読戻し済みです。Secrets５項目の登録名を確認し、Cloudflare公開とSupabaseサーバーキーによる非公開領域の読取りが成功しました。Earthdataの資格情報の有効性は、通信エラーのため未確認です。秘密値はコードやチャットへ貼らないでください。
 
 | 種類 | 名前 |
 |---|---|
@@ -54,7 +57,7 @@ Supabaseに `docs/schema.sql` と `docs/interferogram-schema.sql` を適用し�
 | Secret | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` |
 | Secret（新規InSAR処理用） | `EARTHDATA_USERNAME`, `EARTHDATA_PASSWORD` |
 
-Cloudflare PagesのDirect Uploadプロジェクト名は `mikawa-insar`。公開フォルダは `dist`。`Monthly InSAR monitoring` は毎月2日05:17 JSTに動きます。初回は手動実行してください。秘密キーはGitHubのSecretsへ登録し、コードやチャットに貼らないでください。Web閲覧には原則として保存確認済みの静的スナップショットを使い、Supabaseの転送枠を節約します。
+Cloudflare PagesのDirect Uploadプロジェクト名は `mikawa-insar`。公開フォルダは `dist`。`npm run deploy` は対象プロジェクトが存在しない場合だけ無料の静的公開先を作成し、認証・サーバーエラー時には作成を試みず停止します。`Monthly InSAR monitoring` は毎月2日05:17 JSTに動きます。初回手動実行は外部通信エラーで停止しています。NASA/ASF復旧後は同ワークフローを再実行し、既存ジョブと保存済みペアを再利用します。Web閲覧には原則として保存確認済みの静的スナップショットを使い、Supabaseの転送枠を節約します。
 
 詳しい仕様・判定条件・未完了要件は [実装・検証記録](docs/IMPLEMENTATION.md) を参照してください。
 

@@ -59,7 +59,7 @@ function render() {
   $('generated').textContent = `処理：${report.generated_at.slice(0, 10)}`;
   $('resolution').textContent = `データ解像度 ${Math.max(...report.sources.map(s => s.resolution_m))}m`;
   const age = Math.floor((Date.now() - Date.parse(report.last_observed)) / 86400000);
-  $('notice').textContent = `${report.operational_monthly_insar ? '月次InSARの暫定評価' : '公開InSARの履歴評価'}。最終観測から${age}日。${report.stale || age > 90 ? '観測が古いため、現在の状態は判定できません。' : ''} ${report.operational_monthly_insar ? '参照点・大気誤差・施設対応の現地検証が必要です。' : '新規Sentinel-1の月次処理と個別施設の検証は未接続です。'}`;
+  $('notice').textContent = `${report.operational_monthly_insar ? '月次InSARの暫定評価' : '公開InSARの履歴評価'}。最終観測から${age}日。${report.stale || age > 90 ? '観測が古いため、現在の状態は判定できません。' : ''} ${report.operational_monthly_insar ? '参照点・大気誤差・施設対応の現地検証が必要です。' : 'この履歴は新規Sentinel-1の月次解析結果ではありません。個別施設との対応は未検証です。'}`;
   $('candidates').replaceChildren();
   const ids = new Set(report.candidate_ids);
   const candidates = report.points.filter(p => ids.has(`${p.source_id}:${p.id}`));

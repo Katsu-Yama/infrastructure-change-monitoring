@@ -54,6 +54,6 @@ const assert = require('node:assert/strict');
       assert.equal(await page.locator('#connection').textContent(), '未接続');
     }
     assert.deepEqual(errors, []);
-    console.log('PASS: real report, stale label, map, chart, local note, CSV, mobile, missing data');
+    console.log(`PASS: ${process.env.DASHBOARD_URL ? 'public Cloudflare' : 'local'} report, stale label, map, chart, local note, CSV, mobile${process.env.DASHBOARD_URL ? '' : ', missing data'}`);
   } finally { await browser.close(); server.close(); }
 })().catch(error => { console.error(error); process.exit(1); });
