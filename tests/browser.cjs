@@ -6,12 +6,17 @@ const { resolve, extname } = require('node:path');
 const assert = require('node:assert/strict');
 
 (async () => {
+  const settings = JSON.parse(await readFile('dist/config.json', 'utf8'));
   const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
   const server = createServer(async (req, res) => {
     let path = new URL(req.url, 'http://localhost').pathname;
     const empty = path.startsWith('/empty/');
     if (empty) path = path.slice(6);
     if (path === '/') path = '/index.html';
+    if (empty && path === '/config.json') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ supabaseUrl: '', publishableKey: '', snapshotVerified: false }));
+    }
     const file = resolve('dist', '.' + path);
     if (!file.startsWith(resolve('dist') + require('node:path').sep) || (empty && path === '/baseline.json')) { res.writeHead(404); return res.end(); }
     try { const data = await readFile(file); res.writeHead(200, { 'Content-Type': types[extname(file)] || 'application/octet-stream' }); res.end(data); }
@@ -25,7 +30,8 @@ const assert = require('node:assert/strict');
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.goto(address);
-    await page.locator('#connection').filter({ hasText: '保存済み履歴' }).waitFor();
+    const origin = settings.snapshotVerified ? 'Supabase保存済みスナップショット' : '保存済み履歴';
+    await page.locator('#connection').filter({ hasText: origin }).waitFor();
     assert.equal(await page.locator('#count').textContent(), '5');
     assert((await page.locator('#notice').textContent()).includes('現在の状態は判定できません'));
     assert((await page.locator('#overlay circle').count()) > 500);

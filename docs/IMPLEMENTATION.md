@@ -10,7 +10,7 @@
 - [ ] 施設台帳の登録と観測可能性を確認し、対象4種類の候補抽出を現地記録と照合する。
 - [x] 収集・解析・公開コードをGitHubに保存し、CIを通す（下記検証記録）。
 - [ ] 月次Actionsを起動し、実データで保存・公開まで完走する。
-- [ ] Supabaseで保存結果の読戻し、匿名SELECT、匿名書込み禁止を検証する。
+- [x] Supabaseで保存結果の読戻し、匿名SELECT、匿名書込み禁止を検証する（履歴レポートで全JSON一致）。
 - [ ] Cloudflareの公開URLをブラウザで検証する。
 - [ ] 課金するサービスを使わず、無料枠内の転送・保存・実行量を記録する。
 
@@ -18,7 +18,19 @@
 
 2026年10月20日、コードコミット `0464adc` のGitHub Actions [実行39375233383](https://github.com/Katsu-Yama/infrastructure-change-monitoring/actions/runs/39375233383) で通常テスト・Webビルドと科学計算環境テストが成功した。科学計算環境では15件（実際のMintPyによる合成変位の復元を含む）を実行した。ローカルではブラウザの地図・履歴警告・時系列・CSV・メモ保持・モバイル表示・データ欠落時の表示も確認した。
 
-Cloudflare用の公開ワークフローは `SUPABASE_URL is not configured` で停止した。Supabase専用プロジェクトの組織指定、GitHubへの設定値登録、CloudflareとEarthdataの認証接続、対象施設台帳の確認が残っている。公開URLや新規観測の実測結果はまだ検証できていない。
+接続前のCloudflare用公開ワークフローは `SUPABASE_URL is not configured` で停止していた。その後のSupabase作成・設定値登録と、現在も残る公開・認証・実測の検証事項は次節に記録する。
+
+### 2026年10月20日・Supabase接続後の追記
+
+ユーザー指定の無料組織 `Katsu-Yama's Org` に [mikawa-insar](https://supabase.com/dashboard/project/sxbvyjgzrzynkvounfxy) を東京リージョンで作成した。既存の湖監視プロジェクトは変更していない。３テーブルと公開用RPCを適用し、全テーブルのRLSを有効化した。中間画像用 `mikawa-insar-pairs` バケットは非公開・ZIPのみ・1ファイル5MiB上限で作成した。
+
+履歴レポートの全1,350点（675格子×2観測方向、欠測点を含む）を非公開状態で段階取り込みし、全件確認後に公開した。公開APIから読み戻したJSON全体が `web/baseline.json` と一致することを検証した。これは2025年11月8日までの観測による履歴であり、新規Sentinel-1の月次処理完了を意味しない。
+
+SQLのロール切替テストでは、service_roleの公開RPC、公開済み行だけの匿名SELECT、匿名INSERT/UPDATE/DELETE/RPC拒否、中間テーブル・カタログの匿名読取り拒否を確認した。テストデータは同一トランザクション内でロールバックした。実際のHTTPでも `scripts/verify_supabase.py` により公開レポートのSELECTと権限拒否を確認した。
+
+GitHub Actionsの `SUPABASE_URL` と `SUPABASE_PUBLISHABLE_KEY` は登録・読戻し済み。Secretsは未登録であり、`SUPABASE_SECRET_KEY`、CloudflareのアカウントID・APIトークン、Earthdataのユーザー名・パスワードが必要。現在はこの認証接続、Cloudflare公開、新規観測の実処理、施設台帳との照合が未完了である。
+
+保存後のDB全体は約11MB、レポートテーブル約408KiB。新規InSAR実運用の保存・転送・処理量はまだ未検証。Security Advisorは警告・エラーなし、非公開２テーブルの「RLS有効・ポリシーなし」がINFOとして出る。これは匿名利用を許可しない構成で、実際に拒否されることを確認した。[公式の説明](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)
 
 `python -m scripts.run` が国土地理院の公開数値時系列タイルを収集し、符号・単位をmmに統一し、格子点の変位傾向を再集計する。GSIのSBAS処理済み成果であり、このコードが生のSLCから干渉処理しているわけではない。
 

@@ -12,7 +12,7 @@
 | 最新Sentinel-1の検索とSBASペア作成 | `scripts/sentinel.py plan` | 実カタログで160ペア確認 |
 | 新規干渉処理・時系列化 | `scripts/process_sentinel.py` | HyP3 Basic＋MintPy。認証後の実データ検証が必要 |
 | AOI干渉画像の非公開保存 | `scripts/pair_store.py`, `scripts/clip_pair.py` | 切出し数値テスト済み。Supabase接続後の検証が必要 |
-| Supabase保存・匿名読取り | `docs/schema.sql`, `scripts/publish.py` | 専用プロジェクトの指定待ち |
+| Supabase保存・匿名読取り | `docs/schema.sql`, `scripts/publish.py` | 専用無料プロジェクト作成・実履歴保存・全JSON一致・匿名権限検証済み |
 | 月次Actions・Cloudflare公開 | `.github/workflows/` | Secrets設定・初回完走の検証待ち |
 
 公開済みGSI成果の再集計と、新規Sentinel-1の月次処理は別の段階です。現在の履歴画面は個別施設の現況監視が完了したことを示しません。データ解像度90mで、橋梁等の安全判定はできません。
@@ -44,6 +44,8 @@ python -m scripts.sentinel plan
 
 Supabaseに `docs/schema.sql` と `docs/interferogram-schema.sql` を適用し、GitHub Actionsのvariables/secretsを登録します。
 
+専用プロジェクト [mikawa-insar](https://supabase.com/dashboard/project/sxbvyjgzrzynkvounfxy) は東京リージョンで作成済みです。テーブルと非公開バケットも設定済みで、`SUPABASE_URL` と `SUPABASE_PUBLISHABLE_KEY` はGitHub ActionsのVariablesへ登録・読戻し済みです。残るSecretsの値は、コードやチャットへ貼らずGitHubの設定画面へ登録してください。
+
 | 種類 | 名前 |
 |---|---|
 | Variable | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` |
@@ -55,6 +57,8 @@ Supabaseに `docs/schema.sql` と `docs/interferogram-schema.sql` を適用し�
 Cloudflare PagesのDirect Uploadプロジェクト名は `mikawa-insar`。公開フォルダは `dist`。`Monthly InSAR monitoring` は毎月2日05:17 JSTに動きます。初回は手動実行してください。秘密キーはGitHubのSecretsへ登録し、コードやチャットに貼らないでください。Web閲覧には原則として保存確認済みの静的スナップショットを使い、Supabaseの転送枠を節約します。
 
 詳しい仕様・判定条件・未完了要件は [実装・検証記録](docs/IMPLEMENTATION.md) を参照してください。
+
+`python -m scripts.verify_supabase` で実際の公開APIの読取りと権限拒否を検証できます。テストレコードは作成しません。GitHub CIでも公開URL・公開キーの設定時にこの検証を実行します。
 
 新規観測の軽量カタログ収集は毎日05:37 JST、重い干渉処理は月次です。カタログをSupabaseへ保存・読戻しし、新規観測の有無を記録します。無料DBの休止リスクは残り、休止時は復旧が必要です。公開済みスナップショットはDB休止中も閲覧できます。中間データは約20か月を超えた未使用ペアを削除し、350MiBの上限を守ります。
 
