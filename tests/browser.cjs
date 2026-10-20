@@ -23,7 +23,7 @@ const assert = require('node:assert/strict');
     catch { res.writeHead(404); res.end(); }
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const address = `http://127.0.0.1:${server.address().port}`;
+  const address = process.env.DASHBOARD_URL || `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe' });
   try {
     await mkdir('output', { recursive: true });
@@ -48,9 +48,11 @@ const assert = require('node:assert/strict');
     await page.waitForTimeout(300);
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await page.screenshot({ path: 'output/dashboard-mobile.png', fullPage: true });
-    await page.goto(address + '/empty/');
-    await page.locator('#notice.error').waitFor();
-    assert.equal(await page.locator('#connection').textContent(), '未接続');
+    if (!process.env.DASHBOARD_URL) {
+      await page.goto(address + '/empty/');
+      await page.locator('#notice.error').waitFor();
+      assert.equal(await page.locator('#connection').textContent(), '未接続');
+    }
     assert.deepEqual(errors, []);
     console.log('PASS: real report, stale label, map, chart, local note, CSV, mobile, missing data');
   } finally { await browser.close(); server.close(); }

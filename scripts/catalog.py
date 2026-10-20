@@ -5,6 +5,8 @@ import os
 import urllib.request
 from pathlib import Path
 
+from scripts.asf_retry import catalog_request
+
 
 def main():
     import asf_search as asf
@@ -12,7 +14,7 @@ def main():
     aoi = json.loads(Path('config/mikawa.json').read_text(encoding='utf-8'))
     area = box(*aoi['bbox'])
     now = dt.datetime.now(dt.timezone.utc)
-    products = asf.search(platform=asf.PLATFORM.SENTINEL1, processingLevel=asf.PRODUCT_TYPE.BURST,
+    products = catalog_request(asf.search, platform=asf.PLATFORM.SENTINEL1, processingLevel=asf.PRODUCT_TYPE.BURST,
         beamMode=asf.BEAMMODE.IW, polarization=asf.POLARIZATION.VV, intersectsWith=area.wkt,
         start=(now - dt.timedelta(days=45)).isoformat(), end=now.isoformat(), maxResults=500)
     if len(products) >= 500: raise RuntimeError('Acquisition catalog truncated')

@@ -13,6 +13,8 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
+from scripts.asf_retry import catalog_request
+
 JOB_NAME = 'mikawa-insar-burst-v1'
 
 
@@ -27,7 +29,7 @@ def prepare(aoi, options):
     area = box(*aoi['bbox'])
     end = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=7)  # orbit availability
     start = end - dt.timedelta(days=options['history_days'])
-    products = asf.search(platform=asf.PLATFORM.SENTINEL1,
+    products = catalog_request(asf.search, platform=asf.PLATFORM.SENTINEL1,
         processingLevel=asf.PRODUCT_TYPE.BURST, beamMode=asf.BEAMMODE.IW,
         polarization=asf.POLARIZATION.VV, intersectsWith=area.wkt,
         start=start.isoformat(), end=end.isoformat(), maxResults=5000)
@@ -51,7 +53,7 @@ def prepare(aoi, options):
             continue
         key, chosen = max(candidates, key=lambda item: (len(item[1]), max(p.properties['startTime'] for p in item[1])))
         # ASF computes perpendicular and temporal baselines relative to one scene.
-        baseline = asf.baseline_search.stack_from_product(chosen[0])
+        baseline = catalog_request(asf.baseline_search.stack_from_product, chosen[0])
         records = []
         for product in baseline:
             p = product.properties

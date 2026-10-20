@@ -51,6 +51,9 @@ jobs:
       - run: pip install -r requirements-insar.txt
         if: env.INSAR_SOURCE == 'sentinel'
       - run: python -m unittest discover -s tests -v
+      - name: Verify private storage and Earthdata connections (read-only)
+        if: env.INSAR_SOURCE == 'sentinel'
+        run: python -m scripts.verify_connections
       - name: Collect and analyze real InSAR data
         run: python -m scripts.run --source "$INSAR_SOURCE"
       - name: Store in Supabase and verify readback
