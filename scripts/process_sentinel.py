@@ -113,11 +113,16 @@ def mintpy_source(directory, stack, points, options, reference):
                  'mintpy.topographicResidual = yes', 'mintpy.network.coherenceBased = no',
                  'mintpy.plot = no']
     config.write_text('\n'.join(settings) + '\n', encoding='utf-8')
-    subprocess.run([sys.executable, '-m', 'mintpy.cli.smallbaselineApp', str(config), '--dir', str(work)],
+    subprocess.run([sys.executable, '-m', 'scripts.mintpy_entry', str(config), '--dir', str(work)],
                    check=True, timeout=3600)
     corrected = work / 'timeseries_demErr.h5'
     if not corrected.exists():
         raise RuntimeError('MintPy did not produce the DEM-error-corrected time series')
+    closure_file = work / 'numTriNonzeroIntAmbiguity.h5'
+    if not closure_file.exists():
+        raise RuntimeError('Missing phase-closure quality diagnostic; refusing unchecked output')
+    with h5py.File(closure_file) as quality:
+        closure = quality['mask'][:]
     xs, ys = transform('EPSG:4326', reference['crs'], [p['lon'] for p in points], [p['lat'] for p in points])
     with h5py.File(corrected) as src, h5py.File(work / 'temporalCoherence.h5') as quality:
         unit = src.attrs.get('UNIT', 'm')
@@ -132,7 +137,7 @@ def mintpy_source(directory, stack, points, options, reference):
         values = []
         for x, y in zip(xs, ys):
             c = math.floor((x - x0) / dx); r = math.floor((y - y0) / dy)
-            if not 0 <= r < cube.shape[1] or not 0 <= c < cube.shape[2] or not np.isfinite(coherence[r, c]) or coherence[r, c] < options['min_temporal_coherence']:
+            if not 0 <= r < cube.shape[1] or not 0 <= c < cube.shape[2] or not np.isfinite(coherence[r, c]) or coherence[r, c] < options['min_temporal_coherence'] or not np.isfinite(closure[r, c]) or closure[r, c] != 0:
                 values.append([None] * len(dates))
             else:
                 values.append([round(float(v) * 1000, 3) if np.isfinite(v) else None for v in cube[:, r, c]])
@@ -141,6 +146,7 @@ def mintpy_source(directory, stack, points, options, reference):
             'resolution_m': 40, 'pixel_spacing_m': 20, 'unit': 'mm',
             'component': 'los_toward_satellite_positive', 'dates': dates, 'values': values,
             'reference': reference, 'metadata_url': 'https://search.asf.alaska.edu/',
+            'closure_quality': 'Only pixels with zero detected integer ambiguity in available triplets',
             'credit': 'Contains modified Copernicus Sentinel data; processed by ASF HyP3 / MintPy',
             'corrections': 'DEM residual corrected; atmospheric delay not corrected; preliminary'}
 

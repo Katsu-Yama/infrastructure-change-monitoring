@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['web/**', 'scripts/build.mjs', 'package*.json']
+    paths: ['web/**', 'scripts/build.mjs', 'scripts/export_snapshot.py', '.github/workflows/deploy.yml', 'package*.json']
 permissions:
   contents: read
 jobs:
@@ -22,10 +22,12 @@ jobs:
           node-version: '22'
       - run: npm ci --ignore-scripts
       - run: npm test
-      - run: npm run build
       - name: Verify settings
         run: |
           for name in SUPABASE_URL SUPABASE_PUBLISHABLE_KEY CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN; do
             if [ -z "${!name}" ]; then echo "::error::$name is not configured"; exit 1; fi
           done
+      - name: Preserve latest published monitoring snapshot
+        run: python -m scripts.export_snapshot
+      - run: npm run build
       - run: npm run deploy
