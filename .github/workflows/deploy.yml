@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['web/**', 'scripts/build.mjs', 'scripts/export_snapshot.py', '.github/workflows/deploy.yml', 'package*.json']
+    paths: ['web/**', 'scripts/build.mjs', 'scripts/ensure-pages.mjs', 'scripts/export_snapshot.py', '.github/workflows/deploy.yml', 'package*.json']
 permissions:
   contents: read
 jobs:
