@@ -1,0 +1,29 @@
+name: Collect new Sentinel-1 observations
+on:
+  schedule:
+    - cron: '37 20 * * *' # 毎日05:37 JST。新規観測メタデータのみ。
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mikawa-catalog
+  cancel-in-progress: true
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify settings
+        run: |
+          for name in SUPABASE_URL SUPABASE_SECRET_KEY; do
+            if [ -z "${!name}" ]; then echo "::error::$name is not configured"; exit 1; fi
+          done
+      - run: pip install asf-search==14.1.0 shapely==2.2.0
+      - run: python -m scripts.catalog

@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+.cache/
+output/
+dist/
+node_modules/
+__pycache__/
+*.pyc
+.wrangler/
+.venv/
+research/

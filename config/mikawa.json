@@ -1,0 +1,24 @@
+{
+  "id": "mikawa-jinno",
+  "name": "三河港・神野地区",
+  "bbox": [137.285, 34.717, 137.320, 34.744],
+  "grid_spacing_m": 120,
+  "max_sources_per_direction": 1,
+  "max_download_mb": 80,
+  "max_requests": 3000,
+  "min_observations": 12,
+  "min_span_days": 730,
+  "max_observation_age_days": 90,
+  "candidate_velocity_mm_year": 5,
+  "max_residual_mm": 12,
+  "min_neighbor_support": 3,
+  "max_candidates": 10,
+  "source_catalogs": [
+    "https://sarprod.gsi.go.jp/gsiMaps/sar/layers_txt/layers_tsa_jpn_higashinihonDR.txt",
+    "https://sarprod.gsi.go.jp/gsiMaps/sar/layers_txt/layers_tsa_jpn_nishinihonDR.txt",
+    "https://sarprod.gsi.go.jp/gsiMaps/sar/layers_txt/layers_tsa_jpn_higashinihonAR.txt",
+    "https://sarprod.gsi.go.jp/gsiMaps/sar/layers_txt/layers_tsa_jpn_nishinihonAR.txt"
+  ],
+  "asset_types": ["舗装ヤード", "臨港道路", "橋梁取付部", "護岸背後地"],
+  "asset_registry": "config/assets.geojson"
+}

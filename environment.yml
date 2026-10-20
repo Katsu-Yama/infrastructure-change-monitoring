@@ -1,0 +1,8 @@
+name: mikawa-insar
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - mintpy=1.6.4
+  - gdal=3.10.3
+  - pip

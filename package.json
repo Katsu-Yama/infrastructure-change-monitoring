@@ -1,0 +1,12 @@
+{
+  "name": "mikawa-port-insar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "deploy": "wrangler pages deploy dist --project-name mikawa-insar --branch main"
+  },
+  "devDependencies": { "wrangler": "4.151.2" }
+}

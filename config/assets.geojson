@@ -1,0 +1,5 @@
+{
+  "type": "FeatureCollection",
+  "description": "管理者が確認した施設境界のみ登録する。空の状態では施設との対応は未確認として表示。geometryはWGS84のPolygon/MultiPolygon。propertiesにid,name,asset_type,verified=trueを付ける。",
+  "features": []
+}
