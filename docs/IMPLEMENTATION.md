@@ -40,6 +40,14 @@ GitHub Actionsの `SUPABASE_URL` と `SUPABASE_PUBLISHABLE_KEY` は登録・読�
 - これらの実行からHyP3ジョブは未送信。Supabaseの中間画像・カタログは０件、公開済み履歴は１件のまま。失敗を正常な空データとして保存せず、既存の公開画面を維持した。
 - 次の確認は外部通信復旧後の月次実行。初回の新規干渉処理、実測の精度・観測可能性、施設対応、実運用時の保存・転送量は引き続き未検証。
 
+### Vertexログイン成功の報告後・認証の再診断
+
+ユーザーからVertexにログインできるとの報告を受け、[読取り専用診断39414389650](https://github.com/Katsu-Yama/infrastructure-change-monitoring/actions/runs/39414389650) をGitHub Actions上で実行した。Earthdataの２項目だけを渡し、解析ジョブ・保存・公開処理は実行していない。公式SDKの認証経路は変えず、接続先ホスト、HTTP状態、例外のクラス名のみを記録した。URL・ヘッダー・本文・例外メッセージは記録しない。許可ホスト以外、HTTP、GET以外のリクエストを拒否し、通信タイムアウトを設定した。
+
+DNSとASF APIの公開画面取得は成功。認証なしのEarthdataエンドポイントは想定どおり401、NASA CMR healthは500。GitHubのユーザー名・パスワードは存在し、前後の空白・改行はない。ただし登録値そのものは取得・表示していない。認証情報を渡した公式SDKのEarthdataリクエストもHTTP 401で、`AuthenticationError > HTTPError` としてログイン段階で停止した。前回の `ConnectionError` とは異なる結果であり、ASF全体の通信断とは説明できない。ブラウザで使った情報とActions Secretsの一致、およびAPI認証経路の確認が次の作業となる。401だけでパスワード誤りと断定しない。
+
+診断の４テストでは、認証ヘッダー・OAuthクエリ・例外本文の非出力、許可ホスト・読取り制限、タイムアウト、例外クラスの取得を検証した。通常の月次解析は引き続き未完了。
+
 保存後のDB全体は約11MB、レポートテーブル約408KiB。新規InSAR実運用の保存・転送・処理量はまだ未検証。Security Advisorは警告・エラーなし、非公開２テーブルの「RLS有効・ポリシーなし」がINFOとして出る。これは匿名利用を許可しない構成で、実際に拒否されることを確認した。[公式の説明](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)
 
 `python -m scripts.run` が国土地理院の公開数値時系列タイルを収集し、符号・単位をmmに統一し、格子点の変位傾向を再集計する。GSIのSBAS処理済み成果であり、このコードが生のSLCから干渉処理しているわけではない。

@@ -16,7 +16,7 @@
 | AOI干渉画像の非公開保存 | `scripts/pair_store.py`, `scripts/clip_pair.py` | 切出し数値テスト済み。Supabase接続後の検証が必要 |
 | Supabase保存・匿名読取り | `docs/schema.sql`, `scripts/publish.py` | 専用無料プロジェクト作成・実履歴保存・全JSON一致・匿名権限検証済み |
 | Cloudflare公開 | `.github/workflows/deploy.yml` | 実公開・ブラウザ・全データのSupabase一致を検証済み |
-| 月次Actions | `.github/workflows/monthly.yml` | Secrets５項目登録済み。NASA検索HTTP 500とEarthdata/ASF通信エラーにより初回完走は未完了 |
+| 月次Actions | `.github/workflows/monthly.yml` | Secrets５項目登録済み。NASA検索HTTP 500とActionsからのEarthdata認証HTTP 401により初回完走は未完了 |
 
 公開済みGSI成果の再集計と、新規Sentinel-1の月次処理は別の段階です。現在の履歴画面は個別施設の現況監視が完了したことを示しません。データ解像度90mで、橋梁等の安全判定はできません。
 
@@ -47,7 +47,7 @@ python -m scripts.sentinel plan
 
 Supabaseに `docs/schema.sql` と `docs/interferogram-schema.sql` を適用し、GitHub Actionsのvariables/secretsを登録します。
 
-専用プロジェクト [mikawa-insar](https://supabase.com/dashboard/project/sxbvyjgzrzynkvounfxy) は東京リージョンで作成済みです。テーブルと非公開バケットも設定済みで、`SUPABASE_URL` と `SUPABASE_PUBLISHABLE_KEY` はGitHub ActionsのVariablesへ登録・読戻し済みです。Secrets５項目の登録名を確認し、Cloudflare公開とSupabaseサーバーキーによる非公開領域の読取りが成功しました。Earthdataの資格情報の有効性は、通信エラーのため未確認です。秘密値はコードやチャットへ貼らないでください。
+専用プロジェクト [mikawa-insar](https://supabase.com/dashboard/project/sxbvyjgzrzynkvounfxy) は東京リージョンで作成済みです。テーブルと非公開バケットも設定済みで、`SUPABASE_URL` と `SUPABASE_PUBLISHABLE_KEY` はGitHub ActionsのVariablesへ登録・読戻し済みです。Secrets５項目の登録名を確認し、Cloudflare公開とSupabaseサーバーキーによる非公開領域の読取りが成功しました。Earthdataは初回の通信エラー後、専用の読取り専用診断で認証HTTP 401を確認しました。Vertexではログインできるとの報告があり、GitHub登録値とAPI認証経路の確認が必要です。秘密値はコードやチャットへ貼らないでください。
 
 | 種類 | 名前 |
 |---|---|
