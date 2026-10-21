@@ -19,7 +19,13 @@ import numpy as np
 
 from scripts.clip_pair import clip_archive, unpack_clipped
 from scripts.pair_store import PairStore
-from scripts.sentinel import JOB_NAME, prepare
+from scripts.sentinel import JOB_NAME, prepare, screen_stack
+
+
+class IncoherentPairs(RuntimeError):
+    def __init__(self, pair_ids):
+        self.pair_ids = set(pair_ids)
+        super().__init__('Interferograms have no coherent land in the AOI')
 
 
 def align_and_reference(directory, bbox, options):
@@ -90,6 +96,9 @@ def align_and_reference(directory, bbox, options):
             'maximum_reference_support': int(support[best]),
             'weak_at_best_reference': [files[i].name for i in range(len(files)) if cube[i][best] < 0.35],
             'pairs_without_coherent_land': [files[i].name for i in range(len(files)) if np.max(cube[i]) < 0.35]}), flush=True)
+        unusable = [files[i].parent.name for i in range(len(files)) if np.max(cube[i]) < 0.35]
+        if unusable:
+            raise IncoherentPairs(unusable)
         raise RuntimeError('No common coherent land reference point across all pairs')
     # Keep only the unwrapped component connected to the same spatial reference.
     # A separate disconnected quay is not treated as a referenced measurement.
@@ -222,7 +231,7 @@ def collect_sentinel(aoi, points):
             print(f'Waiting for {len(pending)} existing HyP3 jobs', flush=True)
             time.sleep(20)
     sources = []
-    for stack in plan['stacks']:
+    for stack_index, stack in enumerate(plan['stacks']):
         scratch = Path('output/sentinel'); scratch.mkdir(parents=True, exist_ok=True)
         # Each solve uses only this plan, never leftover pairs or old MintPy outputs.
         with tempfile.TemporaryDirectory(prefix=stack['burst_id'] + '-', dir=scratch) as temporary:
@@ -230,7 +239,28 @@ def collect_sentinel(aoi, points):
             for pair in stack['pairs']:
                 unpack_clipped(store.get(pair['id']), directory / pair['id'])
             print(json.dumps({'stage': 'align', 'direction': stack['direction'], 'pairs': len(stack['pairs'])}), flush=True)
-            reference = align_and_reference(directory, aoi['bbox'], options)
+            try:
+                reference = align_and_reference(directory, aoi['bbox'], options)
+            except IncoherentPairs as error:
+                screened = screen_stack(stack, error.pair_ids)
+                retained = {p['id'] for p in screened['pairs']}
+                excluded = directory.parent / 'excluded'
+                excluded.mkdir()
+                for pair in stack['pairs']:
+                    if pair['id'] in retained:
+                        continue
+                    source = directory / pair['id']
+                    target = excluded / pair['id']
+                    if source.resolve().parent != directory.resolve() or target.resolve().parent != excluded.resolve():
+                        raise RuntimeError('Unexpected temporary pair path')
+                    source.rename(target)
+                stack = screened
+                plan['stacks'][stack_index] = stack
+                plan['pair_count'] = sum(len(s['pairs']) for s in plan['stacks'])
+                Path('output/sentinel-plan.json').write_text(json.dumps(plan, indent=2), encoding='utf-8')
+                print(json.dumps({'stage': 'quality_screened', 'direction': stack['direction'],
+                    'retained_pairs': len(stack['pairs']), 'network': stack['network']}), flush=True)
+                reference = align_and_reference(directory, aoi['bbox'], options)
             sources.append(mintpy_source(directory, stack, points, options, reference))
             print(json.dumps({'stage': 'solved', 'direction': stack['direction']}), flush=True)
     return sources

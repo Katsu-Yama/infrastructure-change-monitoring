@@ -1,6 +1,6 @@
 import unittest
 
-from scripts.sentinel import build_network, connected_components
+from scripts.sentinel import build_network, connected_components, screen_stack
 
 
 OPTIONS = {'max_temporal_baseline_days': 36, 'max_perpendicular_baseline_m': 150,
@@ -26,6 +26,21 @@ class SentinelNetworkTests(unittest.TestCase):
             ('2025-01-01', '2025-01-13'), ('2025-01-01', '2025-02-25'),
             ('2025-01-13', '2025-02-25'))))
         self.assertTrue(all(p['days'] <= 60 and p['perpendicular_baseline_m'] <= 300 for p in pairs))
+
+    def test_quality_exclusion_preserves_latest_connected_reference_frame(self):
+        scenes = [record('2025-01-01'), record('2025-01-13'), record('2025-01-25')]
+        scenes, pairs, network = build_network(scenes, OPTIONS)
+        stack = {'scenes': scenes, 'pairs': pairs, 'network': network}
+        rejected = {p['id'] for p in pairs if p['first_date'] == '2025-01-01'}
+        result = screen_stack(stack, rejected, min_observations=2, min_span_days=0)
+        self.assertEqual([r['date'] for r in result['scenes']], ['2025-01-13', '2025-01-25'])
+        self.assertEqual(len(result['pairs']), 1)
+        self.assertEqual(len(result['network']['quality_excluded_pairs']), 2)
+        with self.assertRaises(RuntimeError):
+            screen_stack(stack, {p['id'] for p in pairs if p['second_date'] == '2025-01-25'},
+                         min_observations=2, min_span_days=0)
+        with self.assertRaises(RuntimeError):
+            screen_stack(stack, rejected)
 
     def test_unbridgeable_history_is_not_joined_to_latest_reference_frame(self):
         records = [record('2025-01-01'), record('2025-01-13'), record('2025-01-25'),

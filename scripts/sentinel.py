@@ -90,6 +90,29 @@ def build_network(records, options):
     return records, pairs, network
 
 
+def screen_stack(stack, rejected_ids, min_observations=12, min_span_days=365):
+    """Exclude wholly incoherent pairs without inventing temporal links."""
+    pairs = [p for p in stack['pairs'] if p['id'] not in rejected_ids]
+    used = {p[k] for p in pairs for k in ('first_date', 'second_date')}
+    records = [r for r in stack['scenes'] if r['date'] in used]
+    latest = stack['scenes'][-1]['date']
+    if latest not in used:
+        raise RuntimeError('Latest observation has no coherent temporal link; refusing a falsely current report')
+    keep = next(c for c in connected_components(records, pairs) if latest in c)
+    records = [r for r in records if r['date'] in keep]
+    pairs = [p for p in pairs if p['first_date'] in keep and p['second_date'] in keep]
+    span = (dt.date.fromisoformat(records[-1]['date']) - dt.date.fromisoformat(records[0]['date'])).days
+    if len(records) < min_observations or span < min_span_days:
+        raise RuntimeError('Coherent network has insufficient connected history after quality screening')
+    network = {**stack.get('network', {}), 'connected': True,
+        'bridge_pair_count': sum(bool(p.get('bridge')) for p in pairs),
+        'excluded_disconnected_dates': sorted(set(stack.get('network', {}).get('excluded_disconnected_dates', [])) |
+            {r['date'] for r in stack['scenes'] if r['date'] not in keep}),
+        'quality_excluded_pairs': [{'first_date': p['first_date'], 'second_date': p['second_date'],
+            'reason': 'no_coherent_land_reference'} for p in stack['pairs'] if p['id'] in rejected_ids]}
+    return {**stack, 'scenes': records, 'pairs': pairs, 'network': network}
+
+
 def prepare(aoi, options):
     import asf_search as asf
     from shapely.geometry import box, shape
