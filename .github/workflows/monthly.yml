@@ -57,6 +57,14 @@ jobs:
         run: python -m scripts.verify_connections
       - name: Collect and analyze real InSAR data
         run: python -m scripts.run --source "$INSAR_SOURCE"
+      - name: Retain processing plan for diagnosis
+        if: always() && env.INSAR_SOURCE == 'sentinel'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentinel-processing-plan
+          path: output/sentinel-plan.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Store in Supabase and verify readback
         run: python -m scripts.publish
       - uses: actions/setup-node@v4

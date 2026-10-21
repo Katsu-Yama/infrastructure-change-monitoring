@@ -27,7 +27,9 @@ def prepare(aoi, options):
     from shapely.geometry import box, shape
 
     area = box(*aoi['bbox'])
-    end = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=7)  # orbit availability
+    # HyP3 checks restituted/precise orbit availability itself. A fixed delay
+    # silently excluded recent processable acquisitions from the monthly report.
+    end = dt.datetime.now(dt.timezone.utc)
     start = end - dt.timedelta(days=options['history_days'])
     products = catalog_request(asf.search, platform=asf.PLATFORM.SENTINEL1,
         processingLevel=asf.PRODUCT_TYPE.BURST, beamMode=asf.BEAMMODE.IW,

@@ -155,6 +155,10 @@ def collect_sentinel(aoi, points):
     import hyp3_sdk as sdk
     options = json.loads(Path('config/sentinel.json').read_text(encoding='utf-8'))
     plan = prepare(aoi, options)
+    print(json.dumps({'stage': 'plan', 'pair_count': plan['pair_count'],
+        'stacks': [{'direction': s['direction'], 'observations': len(s['scenes']),
+                    'last_observed': max(p['date'] for p in s['scenes']),
+                    'pairs': len(s['pairs'])} for s in plan['stacks']]}), flush=True)
     Path('output').mkdir(exist_ok=True)
     Path('output/sentinel-plan.json').write_text(json.dumps(plan, indent=2), encoding='utf-8')
     store = PairStore(options); store.ensure_bucket()
