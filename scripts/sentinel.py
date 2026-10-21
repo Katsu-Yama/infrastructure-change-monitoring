@@ -22,6 +22,74 @@ def pair_id(first, second):
     return hashlib.sha256((first + '\n' + second).encode()).hexdigest()[:32]
 
 
+def connected_components(records, pairs):
+    graph = {r['date']: set() for r in records}
+    for pair in pairs:
+        graph[pair['first_date']].add(pair['second_date'])
+        graph[pair['second_date']].add(pair['first_date'])
+    remaining = set(graph)
+    components = []
+    while remaining:
+        pending = [min(remaining)]
+        seen = set()
+        while pending:
+            date = pending.pop()
+            if date not in seen:
+                seen.add(date)
+                pending.extend(graph[date] - seen)
+        remaining -= seen
+        components.append(seen)
+    return components
+
+
+def build_network(records, options):
+    """Prefer short pairs; add bounded cross-component links when necessary.
+
+    Bridge pairs face the same phase/coherence masks as every other pair. Keep
+    their limits and any excluded dates in provenance, never join independent
+    temporal reference frames as if they were one measured time series.
+    """
+    pairs = []
+    for i, first in enumerate(records):
+        for second in records[i + 1:i + 3]:
+            days = (dt.date.fromisoformat(second['date']) - dt.date.fromisoformat(first['date'])).days
+            bperp = abs(second['perpendicular_baseline_m'] - first['perpendicular_baseline_m'])
+            if 0 < days <= options['max_temporal_baseline_days'] and bperp <= options['max_perpendicular_baseline_m']:
+                pairs.append({'id': pair_id(first['name'], second['name']),
+                    'first': first['name'], 'second': second['name'],
+                    'first_date': first['date'], 'second_date': second['date'],
+                    'days': days, 'perpendicular_baseline_m': round(bperp, 2)})
+    components = connected_components(records, pairs)
+    component_of = {date: i for i, dates in enumerate(components) for date in dates}
+    bridge_days = options.get('max_bridge_temporal_days', options['max_temporal_baseline_days'])
+    bridge_baseline = options.get('max_bridge_perpendicular_m', options['max_perpendicular_baseline_m'])
+    # Retain redundant cross-component links, enabling closure checks instead of
+    # relying on a single untestable edge across a missing-acquisition interval.
+    for i, first in enumerate(records):
+        for second in records[i + 1:]:
+            days = (dt.date.fromisoformat(second['date']) - dt.date.fromisoformat(first['date'])).days
+            if days > bridge_days:
+                break
+            if component_of[first['date']] == component_of[second['date']]:
+                continue
+            bperp = abs(second['perpendicular_baseline_m'] - first['perpendicular_baseline_m'])
+            if 0 < days and bperp <= bridge_baseline:
+                pairs.append({'id': pair_id(first['name'], second['name']),
+                    'first': first['name'], 'second': second['name'],
+                    'first_date': first['date'], 'second_date': second['date'],
+                    'days': days, 'perpendicular_baseline_m': round(bperp, 2), 'bridge': True})
+    components = connected_components(records, pairs)
+    latest = records[-1]['date']
+    keep = next(c for c in components if latest in c)
+    excluded = [r['date'] for r in records if r['date'] not in keep]
+    records = [r for r in records if r['date'] in keep]
+    pairs = [p for p in pairs if p['first_date'] in keep and p['second_date'] in keep]
+    network = {'connected': True, 'bridge_pair_count': sum(bool(p.get('bridge')) for p in pairs),
+        'max_bridge_temporal_days': bridge_days, 'max_bridge_perpendicular_m': bridge_baseline,
+        'excluded_disconnected_dates': excluded}
+    return records, pairs, network
+
+
 def prepare(aoi, options):
     import asf_search as asf
     from shapely.geometry import box, shape
@@ -71,17 +139,14 @@ def prepare(aoi, options):
         records.sort(key=lambda p: p['date'])
         # Exact same dates cannot add an independent temporal constraint.
         records = list({r['date']: r for r in records}.values())
-        pairs = []
-        for i, first in enumerate(records):
-            for second in records[i + 1:i + 3]:
-                days = (dt.date.fromisoformat(second['date']) - dt.date.fromisoformat(first['date'])).days
-                bperp = abs(second['perpendicular_baseline_m'] - first['perpendicular_baseline_m'])
-                if 0 < days <= options['max_temporal_baseline_days'] and bperp <= options['max_perpendicular_baseline_m']:
-                    pairs.append({'id': pair_id(first['name'], second['name']),
-                                  'first': first['name'], 'second': second['name'],
-                                  'first_date': first['date'], 'second_date': second['date'],
-                                  'days': days, 'perpendicular_baseline_m': round(bperp, 2)})
-        stacks.append({'burst_id': key[0], 'direction': direction.lower(), 'scenes': records, 'pairs': pairs})
+        if not records:
+            raise RuntimeError('No observations with usable orbit baselines')
+        records, pairs, network = build_network(records, options)
+        span = (dt.date.fromisoformat(records[-1]['date']) - dt.date.fromisoformat(records[0]['date'])).days
+        if len(records) < aoi['min_observations'] or span < 365:
+            raise RuntimeError(f'{direction}: connected latest observations do not cover a year with sufficient samples')
+        stacks.append({'burst_id': key[0], 'direction': direction.lower(), 'scenes': records,
+                       'pairs': pairs, 'network': network})
     count = sum(len(s['pairs']) for s in stacks)
     if not count:
         raise RuntimeError('No valid SBAS pairs for the AOI')

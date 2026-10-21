@@ -2,6 +2,8 @@
   "history_days": 550,
   "max_temporal_baseline_days": 36,
   "max_perpendicular_baseline_m": 150,
+  "max_bridge_temporal_days": 60,
+  "max_bridge_perpendicular_m": 300,
   "max_pairs": 400,
   "max_new_jobs_per_run": 400,
   "looks": "5x1",

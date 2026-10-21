@@ -147,6 +147,7 @@ def mintpy_source(directory, stack, points, options, reference):
             'component': 'los_toward_satellite_positive', 'dates': dates, 'values': values,
             'reference': reference, 'metadata_url': 'https://search.asf.alaska.edu/',
             'closure_quality': 'Only pixels with zero detected integer ambiguity in available triplets',
+            'network': stack.get('network', {}),
             'credit': 'Contains modified Copernicus Sentinel data; processed by ASF HyP3 / MintPy',
             'corrections': 'DEM residual corrected; atmospheric delay not corrected; preliminary'}
 
