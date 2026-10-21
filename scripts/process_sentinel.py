@@ -56,7 +56,9 @@ def align_and_reference(directory, bbox, options):
         with rasterio.open(file, 'w', **profile) as dst:
             dst.write(dest, 1)
     minimum = np.ones((height, width), dtype=float)
+    pair_quality = []
     for file in files:
+        quality = np.ones((height, width), dtype=float)
         for suffix in ('_corr_clipped.tif', '_water_mask_clipped.tif', '_conncomp_clipped.tif'):
             other = Path(str(file).replace('_unw_phase_clipped.tif', suffix))
             with rasterio.open(other) as src:
@@ -66,7 +68,9 @@ def align_and_reference(directory, bbox, options):
                 values = np.where(valid & (values >= 0) & (values <= 1), values, 0)
             else:
                 values = valid & (values > 0)
-            minimum = np.minimum(minimum, values)
+            quality = np.minimum(quality, values)
+        minimum = np.minimum(minimum, quality)
+        pair_quality.append(quality)
     if options.get('reference_lat_lon'):
         lat, lon = options['reference_lat_lon']
         xs, ys = transform('EPSG:4326', crs, [lon], [lat])
@@ -78,6 +82,14 @@ def align_and_reference(directory, bbox, options):
         row, col = np.unravel_index(np.argmax(minimum), minimum.shape)
         method = 'automatic_maximum_minimum_coherence_unverified'
     if not np.isfinite(minimum[row, col]) or minimum[row, col] < 0.35:
+        cube = np.stack(pair_quality)
+        support = np.sum(cube >= 0.35, axis=0)
+        best = np.unravel_index(np.argmax(support + np.mean(cube, axis=0) / 10), support.shape)
+        print(json.dumps({'stage': 'reference_diagnostic', 'pairs': len(files),
+            'maximum_common_coherence': float(np.max(minimum)),
+            'maximum_reference_support': int(support[best]),
+            'weak_at_best_reference': [files[i].name for i in range(len(files)) if cube[i][best] < 0.35],
+            'pairs_without_coherent_land': [files[i].name for i in range(len(files)) if np.max(cube[i]) < 0.35]}), flush=True)
         raise RuntimeError('No common coherent land reference point across all pairs')
     # Keep only the unwrapped component connected to the same spatial reference.
     # A separate disconnected quay is not treated as a referenced measurement.
@@ -217,6 +229,8 @@ def collect_sentinel(aoi, points):
             directory = Path(temporary) / 'data'
             for pair in stack['pairs']:
                 unpack_clipped(store.get(pair['id']), directory / pair['id'])
+            print(json.dumps({'stage': 'align', 'direction': stack['direction'], 'pairs': len(stack['pairs'])}), flush=True)
             reference = align_and_reference(directory, aoi['bbox'], options)
             sources.append(mintpy_source(directory, stack, points, options, reference))
+            print(json.dumps({'stage': 'solved', 'direction': stack['direction']}), flush=True)
     return sources
