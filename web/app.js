@@ -68,7 +68,10 @@ function render() {
     text('strong', `観測点 ${point.id}`, button);
     text('span', number(point.velocity_mm_year, ' mm/年'), button);
     text('small', `${point.direction === 'ascending' ? '北行' : '南行'} · ${point.stale ? '過去の候補' : '確認候補'} · ${(point.asset_names || []).join(' / ') || '施設未照合'}`, button);
-    button.addEventListener('click', () => showPoint(point));
+    button.addEventListener('click', () => {
+      $('direction').value = point.source_id;
+      renderMap(); showPoint(point);
+    });
   }
   if (!candidates.length) text('p', '今回の基準で確認候補はありません。観測不足や対象施設の安全性は、この件数から判断できません。', $('candidates'), 'empty');
   for (const source of report.sources) {
@@ -84,8 +87,20 @@ function render() {
   $('export').disabled = false;
   $('export').addEventListener('click', exportCsv);
   $('filter').addEventListener('change', renderMap);
-  renderMap();
-  if (candidates.length) showPoint(candidates[0]);
+  const direction = $('direction'); direction.replaceChildren();
+  for (const source of report.sources) {
+    text('option', `${source.direction === 'ascending' ? '北行' : '南行'} · ${source.dates.at(-1)}`, direction).value = source.id;
+  }
+  direction.value = [...report.sources].sort((a, b) => b.dates.at(-1).localeCompare(a.dates.at(-1)))[0].id;
+  const chooseDirection = () => {
+    renderMap();
+    const point = candidates.find(p => p.source_id === direction.value)
+      || report.points.find(p => p.source_id === direction.value && p.quality === 'usable')
+      || report.points.find(p => p.source_id === direction.value);
+    if (point) showPoint(point);
+  };
+  direction.addEventListener('change', chooseDirection);
+  chooseDirection();
 }
 
 // A small, dependency-free map at a fixed, explicit AOI. GSI tiles use Web Mercator.
@@ -117,11 +132,10 @@ function renderMap() {
   const overlay = $('overlay'); overlay.replaceChildren();
   svgElement('rect', { x: bounds[0][0] - corner[0], y: bounds[1][1] - corner[1], width: bounds[1][0] - bounds[0][0], height: bounds[0][1] - bounds[1][1], fill: '#167b7b08', stroke: '#167b7b', 'stroke-dasharray': '5 4' }, overlay);
   const filter = $('filter').value;
-  // Display one direction at a time at overlapping locations, while selecting
-  // other sources remains possible from the candidate list/detail selector.
-  const primary = report.sources[0].id;
+  // Keep overlapping north/south observations independently selectable.
+  const primary = $('direction').value;
   for (const point of report.points) {
-    if (point.source_id !== primary && filter !== 'candidate') continue;
+    if (point.source_id !== primary) continue;
     if (filter === 'candidate' && !['candidate', 'watch'].includes(point.status)) continue;
     if (filter === 'usable' && point.quality !== 'usable') continue;
     if (filter === 'insufficient' && point.quality === 'usable') continue;

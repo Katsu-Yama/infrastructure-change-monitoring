@@ -42,15 +42,28 @@ const assert = require('node:assert/strict');
     const notice = await page.locator('#notice').textContent();
     assert(notice.includes(snapshot.operational_monthly_insar ? '月次InSARの暫定評価' : '公開InSARの履歴評価'));
     if (snapshot.stale) assert(notice.includes('現在の状態は判定できません'));
-    const primaryPoints = snapshot.points.filter(p => p.source_id === snapshot.sources[0].id);
+    const initialDirection = await page.locator('#direction').inputValue();
+    for (const source of snapshot.sources) {
+      await page.locator('#direction').selectOption(source.id);
+      const points = snapshot.points.filter(p => p.source_id === source.id);
+      assert.equal(await page.locator('#overlay circle').count(), points.length);
+      const usable = points.findIndex(p => p.quality === 'usable' && p.series.at(-1) !== null);
+      if (usable >= 0) {
+        await page.locator('#overlay circle').nth(usable).click({ force: true });
+        assert((await page.locator('#detail').textContent()).includes(source.direction === 'ascending' ? '北行' : '南行'));
+        assert((await page.locator('#detail .chart').textContent()).includes(source.dates.at(-1)));
+      }
+    }
+    await page.locator('#direction').selectOption(initialDirection);
+    const primaryPoints = snapshot.points.filter(p => p.source_id === initialDirection);
     assert.equal(await page.locator('#overlay circle').count(), primaryPoints.length);
-    if (snapshot.summary.candidate_count) await page.locator('#candidates button').first().click();
-    else await page.locator('#overlay circle').nth(primaryPoints.findIndex(p => p.quality === 'usable')).click({ force: true });
+    assert.equal(await page.locator('#candidates button').count(), snapshot.summary.candidate_count);
+    await page.locator('#overlay circle').nth(primaryPoints.findIndex(p => p.quality === 'usable')).click({ force: true });
     assert.equal(await page.locator('#detail .chart').count(), 1);
     await page.locator('textarea').fill('現地確認メモ テスト');
     await page.reload();
     await page.locator('#connection').filter({ hasText: origin }).waitFor();
-    if (!snapshot.summary.candidate_count) await page.locator('#overlay circle').nth(primaryPoints.findIndex(p => p.quality === 'usable')).click({ force: true });
+    await page.locator('#overlay circle').nth(primaryPoints.findIndex(p => p.quality === 'usable')).click({ force: true });
     await page.locator('textarea').waitFor();
     assert.equal(await page.locator('textarea').inputValue(), '現地確認メモ テスト');
     const download = page.waitForEvent('download'); await page.locator('#export').click();
