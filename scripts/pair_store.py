@@ -1,6 +1,7 @@
 """Private, bounded Supabase persistence for clipped interferograms."""
 import json
 import os
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -41,8 +42,28 @@ class PairStore:
             data = json.dumps(data).encode()
             headers['Content-Type'] = 'application/json'
         req = urllib.request.Request(self.url + path, data=data, headers=headers, method=method)
-        with urllib.request.urlopen(req, timeout=90) as response:
-            result = response.read(6 * 1024 ** 2)
+        idempotent = method == 'GET' or (method == 'POST' and (
+            headers.get('x-upsert') == 'true' or
+            'resolution=merge-duplicates' in headers.get('Prefer', '')))
+        for attempt in range(4):
+            try:
+                with urllib.request.urlopen(req, timeout=90) as response:
+                    result = response.read(6 * 1024 ** 2)
+                break
+            except urllib.error.HTTPError as error:
+                if not idempotent or attempt == 3 or error.code not in (429, 500, 502, 503, 504, 520, 521, 522, 524):
+                    raise
+                status = error.code
+                error.close()
+                delay = (2, 5, 10)[attempt]
+                print(f'Transient Supabase HTTP {status}; retrying idempotent request in {delay}s', flush=True)
+                time.sleep(delay)
+            except (urllib.error.URLError, TimeoutError, ConnectionError):
+                if not idempotent or attempt == 3:
+                    raise
+                delay = (2, 5, 10)[attempt]
+                print(f'Transient Supabase connection failure; retrying idempotent request in {delay}s', flush=True)
+                time.sleep(delay)
         return result if binary else json.loads(result) if result else None
 
     def ensure_bucket(self):

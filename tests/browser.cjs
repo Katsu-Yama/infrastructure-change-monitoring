@@ -24,21 +24,33 @@ const assert = require('node:assert/strict');
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = process.env.DASHBOARD_URL || `http://127.0.0.1:${server.address().port}`;
+  const snapshot = process.env.DASHBOARD_URL
+    ? await (await fetch(new URL('baseline.json', address))).json()
+    : JSON.parse(await readFile('dist/baseline.json', 'utf8'));
+  const publicSettings = process.env.DASHBOARD_URL
+    ? await (await fetch(new URL('config.json', address))).json() : settings;
   const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe' });
   try {
     await mkdir('output', { recursive: true });
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.goto(address);
-    const origin = settings.snapshotVerified ? 'Supabase保存済みスナップショット' : '保存済み履歴';
+    const origin = publicSettings.snapshotVerified ? 'Supabase保存済みスナップショット' : '保存済み履歴';
     await page.locator('#connection').filter({ hasText: origin }).waitFor();
-    assert.equal(await page.locator('#count').textContent(), '5');
-    assert((await page.locator('#notice').textContent()).includes('現在の状態は判定できません'));
-    assert((await page.locator('#overlay circle').count()) > 500);
-    await page.locator('#candidates button').first().click();
+    assert.equal(await page.locator('#count').textContent(), String(snapshot.summary.candidate_count));
+    assert.equal(await page.locator('#observed').textContent(), snapshot.last_observed);
+    const notice = await page.locator('#notice').textContent();
+    assert(notice.includes(snapshot.operational_monthly_insar ? '月次InSARの暫定評価' : '公開InSARの履歴評価'));
+    if (snapshot.stale) assert(notice.includes('現在の状態は判定できません'));
+    const primaryPoints = snapshot.points.filter(p => p.source_id === snapshot.sources[0].id);
+    assert.equal(await page.locator('#overlay circle').count(), primaryPoints.length);
+    if (snapshot.summary.candidate_count) await page.locator('#candidates button').first().click();
+    else await page.locator('#overlay circle').nth(primaryPoints.findIndex(p => p.quality === 'usable')).click({ force: true });
     assert.equal(await page.locator('#detail .chart').count(), 1);
     await page.locator('textarea').fill('現地確認メモ テスト');
     await page.reload();
+    await page.locator('#connection').filter({ hasText: origin }).waitFor();
+    if (!snapshot.summary.candidate_count) await page.locator('#overlay circle').nth(primaryPoints.findIndex(p => p.quality === 'usable')).click({ force: true });
     await page.locator('textarea').waitFor();
     assert.equal(await page.locator('textarea').inputValue(), '現地確認メモ テスト');
     const download = page.waitForEvent('download'); await page.locator('#export').click();
@@ -54,6 +66,6 @@ const assert = require('node:assert/strict');
       assert.equal(await page.locator('#connection').textContent(), '未接続');
     }
     assert.deepEqual(errors, []);
-    console.log(`PASS: ${process.env.DASHBOARD_URL ? 'public Cloudflare' : 'local'} report, stale label, map, chart, local note, CSV, mobile${process.env.DASHBOARD_URL ? '' : ', missing data'}`);
+    console.log(`PASS: ${process.env.DASHBOARD_URL ? 'public Cloudflare' : 'local'} report through ${snapshot.last_observed}, provenance label, map, chart, local note, CSV, mobile${process.env.DASHBOARD_URL ? '' : ', missing data'}`);
   } finally { await browser.close(); server.close(); }
 })().catch(error => { console.error(error); process.exit(1); });
