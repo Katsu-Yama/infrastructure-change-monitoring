@@ -4,21 +4,21 @@
 
 実データを使った収集・解析・Web画面を追加しました。従来のヒアリングモックは、このREADMEの後半と既存 `index.html` にあります。
 
-公開画面：[三河港 InSAR Monitor](https://mikawa-insar.pages.dev)。現在は最終観測2025年11月8日の履歴です。新規Sentinel-1の月次解析結果ではありません。
+公開画面：[三河港 InSAR Monitor](https://mikawa-insar.pages.dev)。新規Sentinel-1の初回月次解析を完走し、最終観測2026年10月17日まで反映しました。北行48観測（2025-04-24～2026-10-11）、南行40観測（2025-05-12～2026-10-17）による暫定評価です。
 
 | 機能 | 実装 | 検証状態 |
 |---|---|---|
 | 約9.62km²の国土地理院InSAR履歴取得 | `scripts/collect.py` | 実データで動作確認 |
-| 変位候補の抽出・品質判定・CSV | `scripts/analyze.py`, `scripts/run.py` | 初回5候補。ただし2025年までの履歴 |
+| 変位候補の抽出・品質判定・CSV | `scripts/analyze.py`, `scripts/run.py` | 最新結果は利用可能370地点・候補0件。安全性の判定ではない |
 | 地図・時系列・欠測・観測日の表示 | `web/` | ブラウザ・モバイル確認済み |
-| 最新Sentinel-1の検索とSBASペア作成 | `scripts/sentinel.py plan` | 実カタログで160ペア確認 |
-| 新規干渉処理・時系列化 | `scripts/process_sentinel.py` | HyP3 Basic＋MintPy。認証後の実データ検証が必要 |
-| AOI干渉画像の非公開保存 | `scripts/pair_store.py`, `scripts/clip_pair.py` | 切出し数値テスト済み。Supabase接続後の検証が必要 |
+| 最新Sentinel-1の検索とSBASペア作成 | `scripts/sentinel.py plan` | 164ペア生成。品質不足2ペアを除き162ペアで解析 |
+| 新規干渉処理・時系列化 | `scripts/process_sentinel.py` | HyP3 Basic＋MintPyで実データの時系列化・品質判定を完走 |
+| AOI干渉画像の非公開保存 | `scripts/pair_store.py`, `scripts/clip_pair.py` | 164ペア・30.38MiBを保存。重複安全な操作のみ一時通信エラーを再試行 |
 | Supabase保存・匿名読取り | `docs/schema.sql`, `scripts/publish.py` | 専用無料プロジェクト作成・実履歴保存・全JSON一致・匿名権限検証済み |
 | Cloudflare公開 | `.github/workflows/deploy.yml` | 実公開・ブラウザ・全データのSupabase一致を検証済み |
-| 月次Actions | `.github/workflows/monthly.yml` | Secrets５項目登録済み。NASA検索HTTP 500とActionsからのEarthdata認証HTTP 401により初回完走は未完了 |
+| 月次Actions | `.github/workflows/monthly.yml` | [初回完走39622426143](https://github.com/Katsu-Yama/infrastructure-change-monitoring/actions/runs/39622426143)：解析・Supabase読戻し・Cloudflare公開が成功 |
 
-公開済みGSI成果の再集計と、新規Sentinel-1の月次処理は別の段階です。現在の履歴画面は個別施設の現況監視が完了したことを示しません。データ解像度90mで、橋梁等の安全判定はできません。
+現在の公開結果は40m分解能・20m画素間隔の新規Sentinel-1 Burst InSARです。共通参照点の物理的安定性、施設台帳との対応、現地精度は未検証で、大気遅延は未補正です。個別施設の損傷・安全判定には使えません。
 
 ### 手元で動かす
 
@@ -41,13 +41,13 @@ python -m pip install -r requirements-insar.txt
 python -m scripts.sentinel plan
 ```
 
-`output/sentinel-plan.json` に実観測と処理ペアが出力されます。planは認証不要・読み取りのみ。実際の処理は `python -m scripts.run --source sentinel` で行い、EarthdataとSupabaseの認証が必要です。HyP3 Basicだけを利用し、1回400件まで。干渉画像のAOI切出し・非公開保存・共通参照点と連結成分の検査・MintPyによる時系列化までコードを実装していますが、認証後の一気通貫の実データ検証は未完了です。参照点を自動選択した場合、その物理的な安定性は未検証と表示します。
+`output/sentinel-plan.json` に実観測と処理ペアが出力されます。planは認証不要・読み取りのみ。実際の処理は `python -m scripts.run --source sentinel` で行い、EarthdataとSupabaseの認証が必要です。HyP3 Basicだけを利用し、1回400件まで。最新観測を含む一気通貫の実データ検証は完了しました。参照点を自動選択した場合、その物理的な安定性は未検証と表示します。品質除外後も最新日を含むネットワークの連結性と１年以上の期間を必須にします。
 
 ### 無料サービスへの接続
 
 Supabaseに `docs/schema.sql` と `docs/interferogram-schema.sql` を適用し、GitHub Actionsのvariables/secretsを登録します。
 
-専用プロジェクト [mikawa-insar](https://supabase.com/dashboard/project/sxbvyjgzrzynkvounfxy) は東京リージョンで作成済みです。テーブルと非公開バケットも設定済みで、`SUPABASE_URL` と `SUPABASE_PUBLISHABLE_KEY` はGitHub ActionsのVariablesへ登録・読戻し済みです。Secrets５項目の登録名を確認し、Cloudflare公開とSupabaseサーバーキーによる非公開領域の読取りが成功しました。Earthdataは初回の通信エラー後、専用の読取り専用診断で認証HTTP 401を確認しました。Vertexではログインできるとの報告があり、GitHub登録値とAPI認証経路の確認が必要です。秘密値はコードやチャットへ貼らないでください。
+専用プロジェクト [mikawa-insar](https://supabase.com/dashboard/project/sxbvyjgzrzynkvounfxy) は東京リージョンで作成済みです。テーブルと非公開バケット、VariablesとSecrets５項目を設定済みです。Earthdataの２項目更新後、2026年10月21日にActions上の認証・HyP3非公開照会とNASA検索の復旧を確認しました。秘密値は取得・表示していません。秘密値はコードやチャットへ貼らないでください。
 
 | 種類 | 名前 |
 |---|---|
@@ -57,7 +57,7 @@ Supabaseに `docs/schema.sql` と `docs/interferogram-schema.sql` を適用し�
 | Secret | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` |
 | Secret（新規InSAR処理用） | `EARTHDATA_USERNAME`, `EARTHDATA_PASSWORD` |
 
-Cloudflare PagesのDirect Uploadプロジェクト名は `mikawa-insar`。公開フォルダは `dist`。`npm run deploy` は対象プロジェクトが存在しない場合だけ無料の静的公開先を作成し、認証・サーバーエラー時には作成を試みず停止します。`Monthly InSAR monitoring` は毎月2日05:17 JSTに動きます。初回手動実行は外部通信エラーで停止しています。NASA/ASF復旧後は同ワークフローを再実行し、既存ジョブと保存済みペアを再利用します。Web閲覧には原則として保存確認済みの静的スナップショットを使い、Supabaseの転送枠を節約します。
+Cloudflare PagesのDirect Uploadプロジェクト名は `mikawa-insar`。公開フォルダは `dist`。`npm run deploy` は対象プロジェクトが存在しない場合だけ無料の静的公開先を作成し、認証・サーバーエラー時には停止します。`Monthly InSAR monitoring` は毎月2日05:17 JSTに動き、初回手動実行で新規観測の解析・保存・公開まで確認しました。再実行時は既存ジョブと保存済みペアを再利用します。Web閲覧には保存確認済みの静的スナップショットを使い、Supabaseの転送枠を節約します。
 
 詳しい仕様・判定条件・未完了要件は [実装・検証記録](docs/IMPLEMENTATION.md) を参照してください。
 
