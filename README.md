@@ -32,7 +32,7 @@ npm run build
 python -m http.server 8080 --directory dist
 ```
 
-ブラウザで `http://localhost:8080` を開きます。`web/baseline.json` は生成された実データです。DB未設定時は履歴として表示し、DB接続障害時のフォールバックも明示します。
+ブラウザで `http://localhost:8080` を開きます。`web/index.html` をファイルとして直接開いた場合は、ブラウザの制限でJavaScriptやJSONを読み込めないため、最新の公開画面へ自動的に移動します。ローカルで開発・確認する場合は上記のHTTPサーバーから `dist` を表示してください。`web/baseline.json` は生成された実データです。DB未設定時は履歴として表示し、DB接続障害時のフォールバックも明示します。
 
 ### 最新の衛星観測を調べる
 
