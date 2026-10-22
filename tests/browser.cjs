@@ -39,6 +39,12 @@ const assert = require('node:assert/strict');
     await page.locator('#connection').filter({ hasText: origin }).waitFor();
     assert.equal(await page.locator('#count').textContent(), String(snapshot.summary.candidate_count));
     assert.equal(await page.locator('#observed').textContent(), snapshot.last_observed);
+    const rectangle = await page.locator('#overlay > rect').evaluate(el => ({
+      x: el.x.baseVal.value, y: el.y.baseVal.value,
+      width: el.width.baseVal.value, height: el.height.baseVal.value
+    }));
+    assert(rectangle.x >= 29.9 && rectangle.y >= 29.9);
+    assert(rectangle.x + rectangle.width <= 870.1 && rectangle.y + rectangle.height <= 590.1);
     const notice = await page.locator('#notice').textContent();
     assert(notice.includes(snapshot.operational_monthly_insar ? '月次InSARの暫定評価' : '公開InSARの履歴評価'));
     if (snapshot.stale) assert(notice.includes('現在の状態は判定できません'));

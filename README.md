@@ -4,19 +4,21 @@
 
 実データを使った収集・解析・Web画面を追加しました。従来のヒアリングモックは、このREADMEの後半と既存 `index.html` にあります。
 
-公開画面：[三河港 InSAR Monitor](https://mikawa-insar.pages.dev)。新規Sentinel-1の初回月次解析を完走し、最終観測2026年10月17日まで反映しました。北行48観測（2025-04-24～2026-10-11）、南行40観測（2025-05-12～2026-10-17）による暫定評価です。
+公開画面：[三河港 InSAR Monitor](https://mikawa-insar.pages.dev)。指定された新矩形へ変更し、Supabaseの旧監視データ全件を削除後、新範囲で再解析・保存・公開しました。北行49観測（2025-04-24～2026-10-11）による暫定評価です。南行は現在の単一バースト処理で新矩形全体を包含できないため採用していません。
+
+現在の矩形は左上（緯度34.74863、経度137.30809）・右下（緯度34.69886、経度137.34545）、18.94km²です。旧範囲の南行最終日2026-10-17とは、採用する観測系列が異なります。
 
 | 機能 | 実装 | 検証状態 |
 |---|---|---|
-| 約9.62km²の国土地理院InSAR履歴取得 | `scripts/collect.py` | 実データで動作確認 |
-| 変位候補の抽出・品質判定・CSV | `scripts/analyze.py`, `scripts/run.py` | 最新結果は利用可能370地点・候補0件。安全性の判定ではない |
+| 18.94km²の監視矩形・格子生成 | `config/mikawa.json`, `scripts/collect.py` | 指定座標と5,244格子を検証 |
+| 変位候補の抽出・品質判定・CSV | `scripts/analyze.py`, `scripts/run.py` | 最新結果は利用可能2,101地点・候補0件。安全性の判定ではない |
 | 地図・時系列・欠測・観測日の表示 | `web/` | ブラウザ・モバイル確認済み |
-| 最新Sentinel-1の検索とSBASペア作成 | `scripts/sentinel.py plan` | 164ペア生成。品質不足2ペアを除き162ペアで解析 |
+| 最新Sentinel-1の検索とSBASペア作成 | `scripts/sentinel.py plan` | 新矩形の北行94ペアを生成・解析 |
 | 新規干渉処理・時系列化 | `scripts/process_sentinel.py` | HyP3 Basic＋MintPyで実データの時系列化・品質判定を完走 |
-| AOI干渉画像の非公開保存 | `scripts/pair_store.py`, `scripts/clip_pair.py` | 164ペア・30.38MiBを保存。重複安全な操作のみ一時通信エラーを再試行 |
+| AOI干渉画像の非公開保存 | `scripts/pair_store.py`, `scripts/clip_pair.py` | 新矩形の94ペア・37.75MiBを保存。旧範囲の混入を拒否 |
 | Supabase保存・匿名読取り | `docs/schema.sql`, `scripts/publish.py` | 専用無料プロジェクト作成・実履歴保存・全JSON一致・匿名権限検証済み |
 | Cloudflare公開 | `.github/workflows/deploy.yml` | 実公開・ブラウザ・全データのSupabase一致を検証済み |
-| 月次Actions | `.github/workflows/monthly.yml` | [初回完走39622426143](https://github.com/Katsu-Yama/infrastructure-change-monitoring/actions/runs/39622426143)：解析・Supabase読戻し・Cloudflare公開が成功 |
+| 月次Actions | `.github/workflows/monthly.yml` | [新範囲再処理39779347604](https://github.com/Katsu-Yama/infrastructure-change-monitoring/actions/runs/39779347604)：解析・Supabase読戻し・Cloudflare公開が成功 |
 
 現在の公開結果は40m分解能・20m画素間隔の新規Sentinel-1 Burst InSARです。共通参照点の物理的安定性、施設台帳との対応、現地精度は未検証で、大気遅延は未補正です。個別施設の損傷・安全判定には使えません。
 
@@ -32,7 +34,7 @@ npm run build
 python -m http.server 8080 --directory dist
 ```
 
-ブラウザで `http://localhost:8080` を開きます。`web/index.html` をファイルとして直接開いた場合は、ブラウザの制限でJavaScriptやJSONを読み込めないため、最新の公開画面へ自動的に移動します。ローカルで開発・確認する場合は上記のHTTPサーバーから `dist` を表示してください。`web/baseline.json` は生成された実データです。DB未設定時は履歴として表示し、DB接続障害時のフォールバックも明示します。
+ブラウザで `http://localhost:8080` を開きます。`web/index.html` をファイルとして直接開いた場合は、ブラウザの制限でJavaScriptやJSONを読み込めないため、最新の公開画面へ自動的に移動します。ローカルで開発・確認する場合は上記のHTTPサーバーから `dist` を表示してください。同梱の `web/baseline.json` は範囲変更前の実データ履歴です。最新の新矩形を表示するには公開画面、または公開DB設定で `python -m scripts.export_snapshot` を実行後にビルドした画面を使います。DB未設定時の履歴表示と最新月次結果を区別します。
 
 ### 最新の衛星観測を調べる
 
