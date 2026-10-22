@@ -1,7 +1,7 @@
 {
   "id": "mikawa-jinno",
   "name": "三河港・神野地区",
-  "bbox": [137.285, 34.717, 137.320, 34.744],
+  "bbox": [137.30809, 34.69886, 137.34545, 34.74863],
   "grid_spacing_m": 120,
   "max_sources_per_direction": 1,
   "max_download_mb": 80,

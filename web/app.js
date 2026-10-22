@@ -1,3 +1,5 @@
+import { world, fitViewport } from './map-viewport.js';
+
 const $ = id => document.getElementById(id);
 const text = (tag, value, parent, cls) => {
   const node = document.createElement(tag);
@@ -103,18 +105,8 @@ function render() {
   chooseDirection();
 }
 
-// A small, dependency-free map at a fixed, explicit AOI. GSI tiles use Web Mercator.
-function world(lon, lat, z) {
-  const n = 256 * 2 ** z;
-  return [(lon + 180) / 360 * n, (1 - Math.asinh(Math.tan(lat * Math.PI / 180)) / Math.PI) / 2 * n];
-}
-
 function renderMap() {
-  const [west, south, east, north] = report.aoi.bbox;
-  const z = 14;
-  const centre = world((west + east) / 2, (south + north) / 2, z);
-  const corner = [centre[0] - 450, centre[1] - 310];
-  const bounds = [world(west, south, z), world(east, north, z)];
+  const { z, corner, bounds } = fitViewport(report.aoi.bbox);
   const tiles = $('tiles'); tiles.replaceChildren();
   const width = $('map').clientWidth;
   const factor = width / 900;

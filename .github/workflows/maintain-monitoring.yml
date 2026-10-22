@@ -1,0 +1,49 @@
+name: Maintain monitoring data
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        type: choice
+        required: true
+        options: [backup, reset]
+      confirmation:
+        description: Dedicated project reference
+        type: string
+        required: true
+      backup_public_key:
+        description: Base64 public RSA key for encrypted backup only
+        type: string
+        required: false
+      expected_digest:
+        description: Verified local backup inventory SHA256 for reset only
+        type: string
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: mikawa-monthly
+  cancel-in-progress: false
+jobs:
+  maintain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      MAINTENANCE_ACTION: ${{ inputs.action }}
+      RESET_CONFIRMATION: ${{ inputs.confirmation }}
+      BACKUP_PUBLIC_KEY: ${{ inputs.backup_public_key }}
+      EXPECTED_DIGEST: ${{ inputs.expected_digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/reset-monitoring.mjs "$MAINTENANCE_ACTION"
+      - uses: actions/upload-artifact@v4
+        if: success() && inputs.action == 'backup'
+        with:
+          name: encrypted-monitoring-backup
+          path: output/monitoring-backup.enc
+          retention-days: 3
+          if-no-files-found: error

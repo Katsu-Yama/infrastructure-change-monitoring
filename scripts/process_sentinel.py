@@ -184,6 +184,8 @@ def collect_sentinel(aoi, points):
     Path('output').mkdir(exist_ok=True)
     Path('output/sentinel-plan.json').write_text(json.dumps(plan, indent=2), encoding='utf-8')
     store = PairStore(options); store.ensure_bucket()
+    if any(row['metadata'].get('aoi_bbox') != aoi['bbox'] for row in store.rows):
+        raise RuntimeError('Stored interferograms have a different or unknown AOI; reset them before changing the monitoring rectangle')
     active_ids = {pair['id'] for stack in plan['stacks'] for pair in stack['pairs']}
     cutoff = (dt.date.today() - dt.timedelta(days=options['history_days'] + 45)).isoformat()
     store.prune(active_ids, cutoff)
@@ -222,6 +224,7 @@ def collect_sentinel(aoi, points):
                     raise RuntimeError('Downloaded product is outside its temporary directory')
                 clipped = clip_archive(archive, aoi['bbox'])
                 pair['hyp3_job_id'] = job_id
+                pair['aoi_bbox'] = aoi['bbox']
                 store.put(pair, stack, clipped)
             del pending[job_id]
             print(f'Persisted AOI interferogram {pair["id"]}', flush=True)

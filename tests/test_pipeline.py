@@ -54,8 +54,8 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(result['summary']['candidate_count'], 1)
         self.assertTrue(result['stale'])
         self.assertFalse(result['operational_monthly_insar'])
-        self.assertGreaterEqual(result['area_km2'], 5)
-        self.assertLessEqual(result['area_km2'], 10)
+        self.assertGreaterEqual(result['area_km2'], 18.8)
+        self.assertLessEqual(result['area_km2'], 19.1)
         self.assertTrue(all(p['stale'] for p in result['points']))
 
     def test_single_isolated_pixel_is_not_candidate(self):
